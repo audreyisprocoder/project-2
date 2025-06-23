@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Blast</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        h1 {
+            color: #fff;
+            margin-top: 30px;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        #score {
+            color: #ffb300;
+            font-size: 2em;
+            margin: 10px 0 20px 0;
+            text-shadow: 0 2px 8px #000a;
+        }
+        #game {
+            background: #222;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px #000a;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .row {
+            display: flex;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            margin: 2px;
+            background: #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .cell.active {
+            background: #ffb300;
+            color: #222;
+        }
+        .cell.active[data-color="0"] { background: linear-gradient(135deg, #ff0000, #ff8000); color: #fff; }
+        .cell.active[data-color="1"] { background: linear-gradient(135deg, #ff8000, #ffff00); color: #222; }
+        .cell.active[data-color="2"] { background: linear-gradient(135deg, #ffff00, #00ff00); color: #222; }
+        .cell.active[data-color="3"] { background: linear-gradient(135deg, #00ff00, #00ffff); color: #222; }
+        .cell.active[data-color="4"] { background: linear-gradient(135deg, #00ffff, #0000ff); color: #fff; }
+        .cell.active[data-color="5"] { background: linear-gradient(135deg, #0000ff, #8000ff); color: #fff; }
+        .cell.active[data-color="6"] { background: linear-gradient(135deg, #8000ff, #ff00ff); color: #fff; }
+        .cell.active[data-color="7"] { background: linear-gradient(135deg, #ff00ff, #ff0000); color: #fff; }
+        .cell.blast {
+            background: #fff !important;
+            animation: blast-rainbow 0.5s linear;
+            box-shadow: 0 0 32px 16px #fff, 0 0 64px 32px #fff;
+        }
+        .cell.hover {
+            background: #ffe082 !important;
+            box-shadow: 0 0 8px 4px #ffb30088;
+            color: #222;
+        }
+        @keyframes blast-rainbow {
+            0% { background: #fff; box-shadow: 0 0 0 0 #fff; }
+            10% { background: #ff0000; box-shadow: 0 0 32px 16px #ff0000, 0 0 64px 32px #fff; }
+            20% { background: #ff8000; box-shadow: 0 0 32px 16px #ff8000, 0 0 64px 32px #fff; }
+            30% { background: #ffff00; box-shadow: 0 0 32px 16px #ffff00, 0 0 64px 32px #fff; }
+            40% { background: #00ff00; box-shadow: 0 0 32px 16px #00ff00, 0 0 64px 32px #fff; }
+            50% { background: #00ffff; box-shadow: 0 0 32px 16px #00ffff, 0 0 64px 32px #fff; }
+            60% { background: #0000ff; box-shadow: 0 0 32px 16px #0000ff, 0 0 64px 32px #fff; }
+            70% { background: #8000ff; box-shadow: 0 0 32px 16px #8000ff, 0 0 64px 32px #fff; }
+            80% { background: #ff00ff; box-shadow: 0 0 32px 16px #ff00ff, 0 0 64px 32px #fff; }
+            90% { background: #fff; box-shadow: 0 0 64px 32px #fff, 0 0 128px 64px #fff; }
+            100% { background: #fff; box-shadow: 0 0 0 0 #fff; }
+        }
+        #nextBlock {
+            margin: 20px 0 10px 0;
+            color: #fff;
+        }
+        #restartBtn {
+            padding: 10px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            background: #ffb300;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 2px 8px #000a;
+        }
+        #restartBtn:hover {
+            background: #ff8800;
+        }
+        #gameOver {
+            color: #ff4d4d;
+            font-size: 1.5em;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Block Blast</h1>
+    <div id="score">Score: 0</div>
+    <div id="game"></div>
+    <div id="nextBlock">Next Block:</div>
+    <div id="gameOver">Game Over!</div>
+    <button id="restartBtn">Restart</button>
+    <script>
+        // Game config
+        const ROWS = 9;
+        const COLS = 9;
+        const BLOCKS = [
+            // Single
+            [[1]],
+            // 2x1
+            [[1,1]],
+            // 1x2
+            [[1],[1]],
+            // 3x1
+            [[1,1,1]],
+            // 1x3
+            [[1],[1],[1]],
+            // Square
+            [[1,1],[1,1]],
+            // L
+            [[1,0],[1,0],[1,1]],
+            // Reverse L
+            [[0,1],[0,1],[1,1]],
+            // T
+            [[1,1,1],[0,1,0]],
+            // Z
+            [[1,1,0],[0,1,1]]
+        ];
+
+        let board = [];
+        let colorBoard = [];
+        let score = 0;
+        let currentBlock = null;
+        let currentBlockPos = {row: 0, col: 0};
+        let gameOver = false;
+
+        const gameDiv = document.getElementById('game');
+        const scoreDiv = document.getElementById('score');
+        const nextBlockDiv = document.getElementById('nextBlock');
+        const restartBtn = document.getElementById('restartBtn');
+        const gameOverDiv = document.getElementById('gameOver');
+
+        function createBoard() {
+            board = [];
+            colorBoard = [];
+            for (let r = 0; r < ROWS; r++) {
+                let row = [], colorRow = [];
+                for (let c = 0; c < COLS; c++) {
+                    row.push(0);
+                    colorRow.push(null);
+                }
+                board.push(row);
+                colorBoard.push(colorRow);
+            }
+        }
+
+        function drawBoard(hoverPos) {
+            gameDiv.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                for (let c = 0; c < COLS; c++) {
+                    let cellClass = 'cell';
+                    let colorAttr = '';
+                    if (board[r][c]) {
+                        cellClass += ' active';
+                        colorAttr = ` data-color="${colorBoard[r][c] ?? 0}"`;
+                    }
+                    if (hoverPos && isInBlock(currentBlock, hoverPos.row, hoverPos.col, r, c) && canPlaceBlock(currentBlock, hoverPos.row, hoverPos.col)) {
+                        cellClass += ' hover';
+                    }
+                    const cellDiv = document.createElement('div');
+                    cellDiv.setAttribute('class', cellClass);
+                    cellDiv.setAttribute('data-row', r);
+                    cellDiv.setAttribute('data-col', c);
+                    if (colorAttr) cellDiv.setAttribute('data-color', colorBoard[r][c]);
+                    rowDiv.appendChild(cellDiv);
+                }
+                gameDiv.appendChild(rowDiv);
+            }
+        }
+        function isInBlock(block, baseRow, baseCol, r, c) {
+            for (let br = 0; br < block.length; br++) {
+                for (let bc = 0; bc < block[0].length; bc++) {
+                    if (block[br][bc] && baseRow + br === r && baseCol + bc === c) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function drawNextBlock() {
+            nextBlockDiv.innerHTML = 'Next Block:<br>';
+            currentBlock.forEach(row => {
+                row.forEach(cell => {
+                    nextBlockDiv.innerHTML += cell ? '<span style="display:inline-block;width:20px;height:20px;background:#ffb300;margin:2px;border-radius:4px;"></span>' : '<span style="display:inline-block;width:20px;height:20px;margin:2px;"></span>';
+                });
+                nextBlockDiv.innerHTML += '<br>';
+            });
+        }
+
+        function canPlaceBlock(block, row, col) {
+            for (let r = 0; r < block.length; r++) {
+                for (let c = 0; c < block[0].length; c++) {
+                    if (block[r][c]) {
+                        let br = row + r;
+                        let bc = col + c;
+                        if (br < 0 || br >= ROWS || bc < 0 || bc >= COLS || board[br][bc]) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placeBlock(block, row, col) {
+            // Assign a random color index for this block
+            const colorIdx = Math.floor(Math.random() * 8);
+            for (let r2 = 0; r2 < block.length; r2++) {
+                for (let c2 = 0; c2 < block[0].length; c2++) {
+                    if (block[r2][c2]) {
+                        board[row + r2][col + c2] = 1;
+                        colorBoard[row + r2][col + c2] = colorIdx;
+                    }
+                }
+            }
+        }
+
+        function clearLines() {
+            let linesCleared = 0;
+            let blastCells = [];
+            // Clear rows
+            for (let r = 0; r < ROWS; r++) {
+                if (board[r].every(cell => cell)) {
+                    for (let c = 0; c < COLS; c++) blastCells.push([r, c]);
+                    board[r] = Array(COLS).fill(0);
+                    colorBoard[r] = Array(COLS).fill(null);
+                    linesCleared++;
+                }
+            }
+            // Clear columns
+            for (let c = 0; c < COLS; c++) {
+                let colFull = true;
+                for (let r = 0; r < ROWS; r++) {
+                    if (!board[r][c]) {
+                        colFull = false;
+                        break;
+                    }
+                }
+                if (colFull) {
+                    for (let r = 0; r < ROWS; r++) {
+                        blastCells.push([r, c]);
+                        board[r][c] = 0;
+                        colorBoard[r][c] = null;
+                    }
+                    linesCleared++;
+                }
+            }
+            if (blastCells.length) {
+                drawBoard();
+                setTimeout(() => {
+                    blastCells.forEach(([r, c]) => {
+                        const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
+                        if (cell) cell.classList.add('blast');
+                    });
+                    // Update score immediately when blast starts
+                    score += linesCleared * 10;
+                    updateScore();
+                    setTimeout(() => {
+                        blastCells.forEach(([r, c]) => {
+                            const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
+                            if (cell) cell.classList.remove('blast');
+                        });
+                        drawBoard();
+                    }, 500);
+                }, 10);
+            } else {
+                score += linesCleared * 10;
+                updateScore();
+            }
+        }
+
+        function randomBlock() {
+            return JSON.parse(JSON.stringify(BLOCKS[Math.floor(Math.random() * BLOCKS.length)]));
+        }
+
+        function updateScore() {
+            scoreDiv.textContent = 'Score: ' + score;
+        }
+
+        function checkGameOver() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (canPlaceBlock(currentBlock, r, c)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        let hoverCell = null;
+        gameDiv.addEventListener('mousemove', e => {
+            if (gameOver) return;
+            const target = e.target;
+            if (!target.classList.contains('cell')) {
+                drawBoard();
+                hoverCell = null;
+                return;
+            }
+            const row = parseInt(target.dataset.row);
+            const col = parseInt(target.dataset.col);
+            // Only highlight if the block fits entirely within the board
+            if (row + currentBlock.length <= ROWS && col + currentBlock[0].length <= COLS && canPlaceBlock(currentBlock, row, col)) {
+                drawBoard({row, col});
+                hoverCell = {row, col};
+            } else {
+                drawBoard();
+                hoverCell = null;
+            }
+        });
+        gameDiv.addEventListener('mouseleave', () => {
+            drawBoard();
+            hoverCell = null;
+        });
+
+        function handleCellClick(e) {
+            if (gameOver) return;
+            const target = e.target;
+            if (!target.classList.contains('cell')) return;
+            const row = parseInt(target.dataset.row);
+            const col = parseInt(target.dataset.col);
+            // Only allow placement if the block fits entirely within the board
+            if (row + currentBlock.length <= ROWS && col + currentBlock[0].length <= COLS && canPlaceBlock(currentBlock, row, col)) {
+                placeBlock(currentBlock, row, col);
+                clearLines();
+                updateScore();
+                currentBlock = randomBlock();
+                drawNextBlock();
+                drawBoard();
+                if (checkGameOver()) {
+                    gameOver = true;
+                    gameOverDiv.style.display = 'block';
+                }
+            }
+        }
+
+        function restartGame() {
+            createBoard();
+            score = 0;
+            currentBlock = randomBlock();
+            gameOver = false;
+            gameOverDiv.style.display = 'none';
+            updateScore();
+            drawNextBlock();
+            drawBoard();
+        }
+
+        gameDiv.addEventListener('click', handleCellClick);
+        restartBtn.addEventListener('click', restartGame);
+
+        // Start game
+        restartGame();
+    </script>
+</body>
+</html>
