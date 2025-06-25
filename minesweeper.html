@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper</title>
+    <style>
+        body {
+            background: #232526;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+        #game {
+            margin: 20px 0;
+            /* Smaller squares, fit screen */
+            transform: scale(1);
+            transform-origin: top center;
+        }
+        .row {
+            display: flex;
+        }
+        .cell {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #4caf50 60%, #357a38 100%);
+            border: 1px solid #2e7d32;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        .cell.revealed {
+            background: #b9f6ca;
+            color: #222;
+            cursor: default;
+        }
+        .cell.mine {
+            background: #e53935;
+            color: #fff;
+            animation: explode 0.5s linear;
+        }
+        @keyframes explode {
+            0% { background: #e53935; box-shadow: 0 0 0 0 #fff; }
+            50% { background: #fff; box-shadow: 0 0 320vw 160vw #fff, 0 0 640vw 320vw #fff; }
+            100% { background: #e53935; box-shadow: 0 0 0 0 #fff; }
+        }
+        .cell.flagged {
+            background: #ffd54f !important;
+            color: #222 !important;
+        }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            margin: 40px 32px 0 0;
+        }
+        .tool-btn {
+            padding: 10px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            background: #888;
+            color: #fff;
+            cursor: pointer;
+        }
+        .tool-btn.active {
+            background: #ffb300;
+            color: #222;
+            box-shadow: 0 0 12px 4px #ffe082, 0 0 24px 8px #ffb30088;
+            outline: 2px solid #fffbe6;
+            outline-offset: 2px;
+            z-index: 1;
+        }
+        .shovel-cursor {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><text y="28" font-size="28">⛏️</text></svg>') 0 28, pointer !important;
+        }
+        .flag-cursor {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><text y="28" font-size="28">🚩</text></svg>') 0 28, pointer !important;
+        }
+        #restartBtn {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            background: #ffb300;
+            color: #fff;
+            cursor: pointer;
+        }
+        #restartBtn:hover {
+            background: #ff8800;
+        }
+        #backBtn {
+            margin-top: 10px;
+            padding: 8px 24px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            background: #888;
+            color: #fff;
+            cursor: pointer;
+        }
+        #backBtn:hover {
+            background: #555;
+        }
+        #gameOver {
+            color: #ff4d4d;
+            font-size: 1.3em;
+            margin-top: 10px;
+            display: none;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            margin-top: 20px;
+            gap: 20px;
+        }
+        #flashbangText {
+            display:none;
+            position:fixed;
+            top:0;
+            left:0;
+            width:100vw;
+            height:100vh;
+            z-index:9999;
+            pointer-events:none;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex; width: 100%; height: 100%; align-items: flex-start; justify-content: center;">
+        <div class="sidebar">
+            <button id="backBtn" onclick="window.location.href='index.html'">Back to Block Blast</button>
+            <button id="restartBtn">Restart</button>
+            <button id="shovelBtn" class="tool-btn active">Shovel</button>
+            <button id="flagBtn" class="tool-btn">Flag</button>
+            <div id="toolIndicator" style="margin-top:10px;color:#fff;font-size:1em;">Current: Shovel</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <h1>Minesweeper</h1>
+            <div id="game"></div>
+            <div id="gameOver">Game Over!</div>
+            <button id="restartBtnGameOver" style="display:none;margin-top:10px;padding:10px 30px;font-size:1.1em;border:none;border-radius:8px;background:#ffb300;color:#fff;cursor:pointer;">Restart</button>
+            <div id="flashbangText" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;pointer-events:none;display:none;align-items:center;justify-content:center;">
+                <span style="font-size:4vw;font-weight:bold;color:#ff2222;text-shadow:0 0 32px #fff,0 0 64px #ff2222;">FLASHBANG YOU LOST!</span>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Minesweeper config
+        const ROWS = 16;
+        const COLS = 16;
+        const MINES = 40;
+        let board = [];
+        let revealed = [];
+        let flagged = [];
+        let gameOver = false;
+        let currentTool = 'shovel'; // 'shovel' or 'flag'
+        const gameDiv = document.getElementById('game');
+        const gameOverDiv = document.getElementById('gameOver');
+        const shovelBtn = document.getElementById('shovelBtn');
+        const flagBtn = document.getElementById('flagBtn');
+        const toolIndicator = document.getElementById('toolIndicator');
+        function createBoard() {
+            board = [];
+            revealed = [];
+            flagged = [];
+            for (let r = 0; r < ROWS; r++) {
+                let row = [], revRow = [], flagRow = [];
+                for (let c = 0; c < COLS; c++) {
+                    row.push({ mine: false, count: 0 });
+                    revRow.push(false);
+                    flagRow.push(false);
+                }
+                board.push(row);
+                revealed.push(revRow);
+                flagged.push(flagRow);
+            }
+            // Place mines
+            let placed = 0;
+            while (placed < MINES) {
+                let r = Math.floor(Math.random() * ROWS);
+                let c = Math.floor(Math.random() * COLS);
+                if (!board[r][c].mine) {
+                    board[r][c].mine = true;
+                    placed++;
+                }
+            }
+            // Count adjacent mines
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c].mine) continue;
+                    let count = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            let nr = r + dr, nc = c + dc;
+                            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc].mine) count++;
+                        }
+                    }
+                    board[r][c].count = count;
+                }
+            }
+            // Randomly reveal a small safe portion
+            revealRandomSafePortion();
+        }
+        function revealRandomSafePortion() {
+            // Find all non-mine cells
+            let safeCells = [];
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (!board[r][c].mine) safeCells.push([r, c]);
+                }
+            }
+            if (safeCells.length === 0) return;
+            // Pick a random safe cell
+            const [startR, startC] = safeCells[Math.floor(Math.random() * safeCells.length)];
+            // Reveal a 2x2 or 3x3 area around it (preferably 3x3 if possible)
+            const size = 3;
+            for (let dr = -Math.floor(size/2); dr <= Math.floor(size/2); dr++) {
+                for (let dc = -Math.floor(size/2); dc <= Math.floor(size/2); dc++) {
+                    let nr = startR + dr, nc = startC + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !board[nr][nc].mine) {
+                        revealed[nr][nc] = true;
+                    }
+                }
+            }
+        }
+        function drawBoard(explodeAll = false) {
+            gameDiv.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                for (let c = 0; c < COLS; c++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    cellDiv.dataset.row = r;
+                    cellDiv.dataset.col = c;
+                    if (revealed[r][c] || (explodeAll && board[r][c].mine)) {
+                        cellDiv.classList.add('revealed');
+                        if (board[r][c].mine) {
+                            cellDiv.classList.add('mine');
+                            cellDiv.textContent = '💣';
+                        } else if (board[r][c].count > 0) {
+                            cellDiv.textContent = board[r][c].count;
+                        }
+                    } else if (flagged[r][c]) {
+                        cellDiv.textContent = '🚩';
+                        cellDiv.style.background = '#ffd54f';
+                        cellDiv.style.color = '#222';
+                    }
+                    rowDiv.appendChild(cellDiv);
+                }
+                gameDiv.appendChild(rowDiv);
+            }
+        }
+        function revealCell(r, c) {
+            if (gameOver || revealed[r][c] || flagged[r][c]) return;
+            revealed[r][c] = true;
+            if (board[r][c].mine) {
+                gameOver = true;
+                revealAllBombs();
+                drawBoard(true);
+                showFlashbangText();
+                gameOverDiv.style.display = 'block';
+                document.getElementById('restartBtnGameOver').style.display = 'block';
+            } else if (board[r][c].count === 0) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                            revealCell(nr, nc);
+                        }
+                    }
+                }
+            }
+            drawBoard();
+        }
+        function showFlashbangText() {
+            const flashbang = document.getElementById('flashbangText');
+            flashbang.style.display = 'flex';
+            setTimeout(() => {
+                flashbang.style.display = 'none';
+            }, 1200);
+        }
+        function revealAllBombs() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c].mine) revealed[r][c] = true;
+                }
+            }
+        }
+        function flagCell(r, c) {
+            if (gameOver || revealed[r][c]) return;
+            flagged[r][c] = !flagged[r][c];
+            drawBoard();
+        }
+        function setTool(tool) {
+            currentTool = tool;
+            shovelBtn.classList.toggle('active', tool === 'shovel');
+            flagBtn.classList.toggle('active', tool === 'flag');
+            toolIndicator.textContent = `Current: ${tool.charAt(0).toUpperCase() + tool.slice(1)}`;
+            gameDiv.classList.toggle('shovel-cursor', tool === 'shovel');
+            gameDiv.classList.toggle('flag-cursor', tool === 'flag');
+        }
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            gameOver = false;
+            gameOverDiv.style.display = 'none';
+            document.getElementById('restartBtnGameOver').style.display = 'none';
+            createBoard();
+            drawBoard();
+        });
+        document.getElementById('restartBtnGameOver').addEventListener('click', () => {
+            gameOver = false;
+            gameOverDiv.style.display = 'none';
+            document.getElementById('restartBtnGameOver').style.display = 'none';
+            createBoard();
+            drawBoard();
+        });
+        document.getElementById('shovelBtn').addEventListener('click', () => setTool('shovel'));
+        document.getElementById('flagBtn').addEventListener('click', () => setTool('flag'));
+        gameDiv.addEventListener('click', (e) => {
+            if (gameOver) return;
+            const cell = e.target.closest('.cell');
+            if (!cell) return;
+            const r = parseInt(cell.dataset.row);
+            const c = parseInt(cell.dataset.col);
+            if (isNaN(r) || isNaN(c)) return;
+            if (currentTool === 'shovel') {
+                revealCell(r, c);
+            } else if (currentTool === 'flag') {
+                flagCell(r, c);
+            }
+        });
+        createBoard();
+        drawBoard();
+    </script>
+</body>
+</html>

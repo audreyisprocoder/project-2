@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man</title>
+    <style>
+        body {
+            background: #232526;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+        #game {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .row {
+            display: flex;
+        }
+        .cell {
+            width: 28px;
+            height: 28px;
+            background: #222;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            position: relative;
+        }
+        .wall {
+            background: #1976d2;
+        }
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .pacman {
+            width: 22px;
+            height: 22px;
+            background: yellow;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+        .ghost {
+            width: 22px;
+            height: 22px;
+            background: #e53935;
+            border-radius: 50% 50% 40% 40%;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+        .ghost2 {
+            width: 22px;
+            height: 22px;
+            background: #00bcd4;
+            border-radius: 50% 50% 40% 40%;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+        .powerpellet {
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            border: 3px solid #ffb300;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px 2px #ffb300;
+        }
+        .powerpellet.break {
+            border-color: #e53935;
+            box-shadow: 0 0 8px 2px #e53935;
+        }
+        .powerpellet.speed {
+            border-color: #00bcd4;
+            box-shadow: 0 0 8px 2px #00bcd4;
+        }
+        .door {
+            background: #ffb300 !important;
+            border: 2px solid #fffbe6;
+        }
+        #score {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            color: #ffb300;
+        }
+        #gameOver {
+            color: #ff4d4d;
+            font-size: 1.5em;
+            margin-top: 10px;
+            display: none;
+        }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            margin: 40px 32px 0 0;
+        }
+        #backBtn {
+            margin-top: 10px;
+            padding: 8px 24px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            background: #888;
+            color: #fff;
+            cursor: pointer;
+        }
+        #backBtn:hover {
+            background: #555;
+        }
+        .sidebar-controls {
+            margin-top: 24px;
+            background: #222;
+            border-radius: 8px;
+            padding: 12px 18px;
+            color: #fff;
+            font-size: 0.98em;
+            box-shadow: 0 2px 8px #0002;
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex; width: 100%; height: 100%; align-items: flex-start; justify-content: center;">
+        <div class="sidebar">
+            <button id="backBtn" onclick="window.location.href='index.html'">Back to Block Blast</button>
+            <div class="sidebar-controls">
+                <b>Controls:</b><br>
+                Move: <b>WASD</b> or <b>Arrows</b><br>
+                Power: <b>Spacebar</b><br>
+                <br>
+                <b>Goal:</b> Eat all dots and escape!<br>
+                <b>Power Pellets:</b><br>
+                <span style="color:#e53935">Red</span>: Break wall in front (Spacebar)<br>
+                <span style="color:#00bcd4">Blue</span>: Speed boost (Spacebar)<br>
+                <b>Tip:</b> When all dots are gone, a door opens. Reach it to win!
+            </div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <h1>Pac-Man</h1>
+            <div id="score">Score: 0</div>
+            <div id="game"></div>
+            <div id="gameOver">Game Over!</div>
+        </div>
+    </div>
+    <script>
+        // Simple Pac-Man grid (WASD controls)
+        const ROWS = 15, COLS = 19;
+        const LAYOUT = [
+            '###################',
+            '#o......#......O..#',
+            '#.###.###.###.###.#',
+            '#.................#',
+            '#.###.#.###.#.###.#',
+            '#.....#...#.#.....#',
+            '#####.###.#.###.###',
+            '#####.#.....#.#####',
+            '#####.#.###.#.#####',
+            '#........#........#',
+            '#.###.###.###.###.#',
+            '#...#.........#...#',
+            '###.#.#.###.#.#.###',
+            '#..O.....#.....o..#',
+            '###################'
+        ];
+        let board = [];
+        let pacman = {r: 1, c: 1, dir: 'RIGHT', nextDir: 'RIGHT', px: 1, py: 1};
+        let ghost = {r: 7, c: 9, dir: 'LEFT', lastDir: 'LEFT'};
+        let ghost2 = {r: 7, c: 8, dir: 'RIGHT', lastDir: 'RIGHT'};
+        let score = 0;
+        let gameOver = false;
+        let win = false;
+        let powerPellet = null; // null, 'break', 'speed'
+        let powerPelletActive = false;
+        let powerPelletTimer = 0;
+        let speedBoost = false;
+        let doorOpen = false;
+        let doorPos = {r: 0, c: 9};
+        function createBoard() {
+            board = [];
+            for (let r = 0; r < ROWS; r++) {
+                let row = [];
+                for (let c = 0; c < COLS; c++) {
+                    let ch = LAYOUT[r][c];
+                    row.push({
+                        wall: ch === '#',
+                        dot: ch === '.',
+                        powerpellet: ch === 'o' ? 'break' : (ch === 'O' ? 'speed' : null),
+                        door: false
+                    });
+                }
+                board.push(row);
+            }
+        }
+        function drawBoard() {
+            const gameDiv = document.getElementById('game');
+            gameDiv.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                for (let c = 0; c < COLS; c++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    if (board[r][c].wall) cellDiv.classList.add('wall');
+                    if (board[r][c].door) cellDiv.classList.add('door');
+                    if (board[r][c].dot) {
+                        const dot = document.createElement('div');
+                        dot.className = 'dot';
+                        cellDiv.appendChild(dot);
+                    }
+                    if (board[r][c].powerpellet) {
+                        const pellet = document.createElement('div');
+                        pellet.className = 'powerpellet ' + board[r][c].powerpellet;
+                        cellDiv.appendChild(pellet);
+                    }
+                    if (pacman.r === r && pacman.c === c) {
+                        const pm = document.createElement('div');
+                        pm.className = 'pacman';
+                        cellDiv.appendChild(pm);
+                    }
+                    if (ghost.r === r && ghost.c === c) {
+                        const gh = document.createElement('div');
+                        gh.className = 'ghost';
+                        cellDiv.appendChild(gh);
+                    }
+                    if (ghost2.r === r && ghost2.c === c) {
+                        const gh2 = document.createElement('div');
+                        gh2.className = 'ghost2';
+                        cellDiv.appendChild(gh2);
+                    }
+                    rowDiv.appendChild(cellDiv);
+                }
+                gameDiv.appendChild(rowDiv);
+            }
+        }
+        function allDotsEaten() {
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (board[r][c].dot) return false;
+            return true;
+        }
+        function openDoor() {
+            board[doorPos.r][doorPos.c].wall = false;
+            board[doorPos.r][doorPos.c].door = true;
+            doorOpen = true;
+        }
+        function movePacman() {
+            if (gameOver || win) return;
+            let dir = pacman.nextDir;
+            let dr = 0, dc = 0;
+            if (dir === 'UP') dr = -1;
+            if (dir === 'DOWN') dr = 1;
+            if (dir === 'LEFT') dc = -1;
+            if (dir === 'RIGHT') dc = 1;
+            let nr = pacman.r + dr, nc = pacman.c + dc;
+            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || board[nr][nc].wall) {
+                // If blocked, don't move
+                return;
+            }
+            pacman.r = nr; pacman.c = nc; pacman.dir = dir;
+            if (board[nr][nc].dot) {
+                board[nr][nc].dot = false;
+                score += 10;
+                updateScore();
+            }
+            if (board[nr][nc].powerpellet) {
+                powerPellet = board[nr][nc].powerpellet;
+                board[nr][nc].powerpellet = null;
+                score += 50;
+                updateScore();
+            }
+            if (doorOpen && board[nr][nc].door) {
+                win = true;
+                document.getElementById('gameOver').textContent = 'You Escaped!';
+                document.getElementById('gameOver').style.display = 'block';
+                return;
+            }
+            if (!powerPelletActive && ((ghost.r === pacman.r && ghost.c === pacman.c) || (ghost2.r === pacman.r && ghost2.c === pacman.c))) {
+                endGame();
+                return;
+            }
+            if (powerPelletActive) {
+                // Eat ghosts if colliding
+                if (ghost.r === pacman.r && ghost.c === pacman.c) {
+                    ghost.r = 7; ghost.c = 9;
+                    score += 200;
+                    updateScore();
+                }
+                if (ghost2.r === pacman.r && ghost2.c === pacman.c) {
+                    ghost2.r = 7; ghost2.c = 8;
+                    score += 200;
+                    updateScore();
+                }
+            }
+            if (allDotsEaten() && !doorOpen) openDoor();
+            drawBoard();
+        }
+        function getValidDirs(entity) {
+            const dirs = [
+                {dr:-1,dc:0,dir:'UP'},
+                {dr:1,dc:0,dir:'DOWN'},
+                {dr:0,dc:-1,dir:'LEFT'},
+                {dr:0,dc:1,dir:'RIGHT'}
+            ];
+            return dirs.filter(d => {
+                let nr = entity.r + d.dr, nc = entity.c + d.dc;
+                return nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !board[nr][nc].wall && !board[nr][nc].door;
+            });
+        }
+        function moveGhostAI(ghost, target) {
+            let options = getValidDirs(ghost).filter(d => {
+                // Don't reverse unless stuck
+                if (ghost.lastDir) {
+                    if ((ghost.lastDir === 'UP' && d.dir === 'DOWN') ||
+                        (ghost.lastDir === 'DOWN' && d.dir === 'UP') ||
+                        (ghost.lastDir === 'LEFT' && d.dir === 'RIGHT') ||
+                        (ghost.lastDir === 'RIGHT' && d.dir === 'LEFT')) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+            if (options.length === 0) options = getValidDirs(ghost); // allow reverse if stuck
+            let best = null, minDist = Infinity;
+            for (let d of options) {
+                let nr = ghost.r + d.dr, nc = ghost.c + d.dc;
+                let dist = Math.abs(nr - target.r) + Math.abs(nc - target.c);
+                if (dist < minDist) {
+                    minDist = dist;
+                    best = d;
+                }
+            }
+            if (best) {
+                ghost.r += best.dr; ghost.c += best.dc; ghost.lastDir = best.dir;
+            }
+        }
+        function moveGhost() {
+            if (gameOver || win) return;
+            moveGhostAI(ghost, pacman);
+            if (!powerPelletActive && ghost.r === pacman.r && ghost.c === pacman.c) {
+                endGame();
+                return;
+            }
+            drawBoard();
+        }
+        function moveGhost2() {
+            if (gameOver || win) return;
+            // Second ghost: random valid direction, no wall bump
+            let options = getValidDirs(ghost2).filter(d => {
+                if (ghost2.lastDir) {
+                    if ((ghost2.lastDir === 'UP' && d.dir === 'DOWN') ||
+                        (ghost2.lastDir === 'DOWN' && d.dir === 'UP') ||
+                        (ghost2.lastDir === 'LEFT' && d.dir === 'RIGHT') ||
+                        (ghost2.lastDir === 'RIGHT' && d.dir === 'LEFT')) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+            if (options.length === 0) options = getValidDirs(ghost2);
+            let pick = options[Math.floor(Math.random() * options.length)];
+            if (pick) {
+                ghost2.r += pick.dr; ghost2.c += pick.dc; ghost2.lastDir = pick.dir;
+            }
+            if (!powerPelletActive && ghost2.r === pacman.r && ghost2.c === pacman.c) {
+                endGame();
+                return;
+            }
+            drawBoard();
+        }
+        function updateScore() {
+            document.getElementById('score').textContent = 'Score: ' + score;
+        }
+        function endGame() {
+            gameOver = true;
+            document.getElementById('gameOver').textContent = 'Game Over!';
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        document.addEventListener('keydown', e => {
+            if (gameOver || win) return;
+            if (e.key === 'w' || e.key === 'ArrowUp') pacman.nextDir = 'UP';
+            if (e.key === 's' || e.key === 'ArrowDown') pacman.nextDir = 'DOWN';
+            if (e.key === 'a' || e.key === 'ArrowLeft') pacman.nextDir = 'LEFT';
+            if (e.key === 'd' || e.key === 'ArrowRight') pacman.nextDir = 'RIGHT';
+            if (e.key === ' ' && powerPellet) {
+                if (powerPellet === 'break') {
+                    // Break wall in front
+                    let dr = 0, dc = 0;
+                    if (pacman.dir === 'UP') dr = -1;
+                    if (pacman.dir === 'DOWN') dr = 1;
+                    if (pacman.dir === 'LEFT') dc = -1;
+                    if (pacman.dir === 'RIGHT') dc = 1;
+                    let nr = pacman.r + dr, nc = pacman.c + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc].wall) {
+                        board[nr][nc].wall = false;
+                        drawBoard();
+                        powerPellet = null;
+                    }
+                } else if (powerPellet === 'speed') {
+                    speedBoost = true;
+                    setTimeout(() => { speedBoost = false; }, 3500);
+                    powerPellet = null;
+                }
+            }
+        });
+        function restartGame() {
+            pacman = {r: 1, c: 1, dir: 'RIGHT', nextDir: 'RIGHT', px: 1, py: 1};
+            ghost = {r: 7, c: 9, dir: 'LEFT', lastDir: 'LEFT'};
+            ghost2 = {r: 7, c: 8, dir: 'RIGHT', lastDir: 'RIGHT'};
+            score = 0;
+            gameOver = false;
+            win = false;
+            powerPellet = null;
+            powerPelletActive = false;
+            powerPelletTimer = 0;
+            speedBoost = false;
+            doorOpen = false;
+            createBoard();
+            updateScore();
+            drawBoard();
+        }
+        // Smoother, slower movement
+        let lastMove = 0, lastGhost = 0, lastGhost2 = 0;
+        function gameLoop(ts) {
+            if (!lastMove) lastMove = ts;
+            if (!lastGhost) lastGhost = ts;
+            if (!lastGhost2) lastGhost2 = ts;
+            let moveInterval = speedBoost ? 80 : 220;
+            let ghostInterval = 400;
+            let ghost2Interval = 600;
+            if (ts - lastMove > moveInterval) {
+                movePacman();
+                lastMove = ts;
+            }
+            if (ts - lastGhost > ghostInterval) {
+                moveGhost();
+                lastGhost = ts;
+            }
+            if (ts - lastGhost2 > ghost2Interval) {
+                moveGhost2();
+                lastGhost2 = ts;
+            }
+            if (!gameOver && !win) requestAnimationFrame(gameLoop);
+        }
+        restartGame();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

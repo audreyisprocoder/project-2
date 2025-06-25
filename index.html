@@ -109,15 +109,61 @@
             margin-top: 10px;
             display: none;
         }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            margin: 40px 32px 0 0;
+        }
+        #minesweeperBtn {
+            padding: 10px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            background: #888;
+            color: #fff;
+            cursor: pointer;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px #000a;
+        }
+        #pacmanBtn {
+            padding: 10px 30px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            background: #888;
+            color: #fff;
+            cursor: pointer;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px #000a;
+        }
     </style>
 </head>
 <body>
-    <h1>Block Blast</h1>
-    <div id="score">Score: 0</div>
-    <div id="game"></div>
-    <div id="nextBlock">Next Block:</div>
-    <div id="gameOver">Game Over!</div>
-    <button id="restartBtn">Restart</button>
+    <div style="display: flex; width: 100%; height: 100%; align-items: flex-start; justify-content: center;">
+        <div class="sidebar">
+            <button id="minesweeperBtn" style="padding:10px 30px;font-size:1.2em;border:none;border-radius:8px;background:#888;color:#fff;cursor:pointer;margin-bottom:10px;box-shadow:0 2px 8px #000a;">Go to Minesweeper</button>
+            <button id="pacmanBtn" style="padding:10px 30px;font-size:1.2em;border:none;border-radius:8px;background:#888;color:#fff;cursor:pointer;margin-bottom:10px;box-shadow:0 2px 8px #000a;">Go to Pac-Man</button>
+            <button id="restartBtn">Restart</button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;">
+            <h1>Block Blast</h1>
+            <div id="score">Score: 0</div>
+            <div id="game"></div>
+            <div id="nextBlock">Next Block:</div>
+            <div id="gameOver">Game Over!</div>
+        </div>
+    </div>
+    <style>
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            margin: 40px 32px 0 0;
+        }
+    </style>
     <script>
         // Game config
         const ROWS = 9;
@@ -149,6 +195,7 @@
         let colorBoard = [];
         let score = 0;
         let currentBlock = null;
+        let nextBlock = null;
         let currentBlockPos = {row: 0, col: 0};
         let gameOver = false;
 
@@ -184,6 +231,7 @@
                         cellClass += ' active';
                         colorAttr = ` data-color="${colorBoard[r][c] ?? 0}"`;
                     }
+                    // Only highlight hover if the block fits and is not the same as nextBlock
                     if (hoverPos && isInBlock(currentBlock, hoverPos.row, hoverPos.col, r, c) && canPlaceBlock(currentBlock, hoverPos.row, hoverPos.col)) {
                         cellClass += ' hover';
                     }
@@ -210,7 +258,7 @@
 
         function drawNextBlock() {
             nextBlockDiv.innerHTML = 'Next Block:<br>';
-            currentBlock.forEach(row => {
+            nextBlock.forEach(row => {
                 row.forEach(cell => {
                     nextBlockDiv.innerHTML += cell ? '<span style="display:inline-block;width:20px;height:20px;background:#ffb300;margin:2px;border-radius:4px;"></span>' : '<span style="display:inline-block;width:20px;height:20px;margin:2px;"></span>';
                 });
@@ -355,7 +403,8 @@
                 placeBlock(currentBlock, row, col);
                 clearLines();
                 updateScore();
-                currentBlock = randomBlock();
+                currentBlock = nextBlock;
+                nextBlock = randomBlock();
                 drawNextBlock();
                 drawBoard();
                 if (checkGameOver()) {
@@ -369,6 +418,7 @@
             createBoard();
             score = 0;
             currentBlock = randomBlock();
+            nextBlock = randomBlock();
             gameOver = false;
             gameOverDiv.style.display = 'none';
             updateScore();
@@ -377,7 +427,13 @@
         }
 
         gameDiv.addEventListener('click', handleCellClick);
-        restartBtn.addEventListener('click', restartGame);
+        document.getElementById('minesweeperBtn').addEventListener('click', function() {
+            window.location.href = 'minesweeper.html';
+        });
+        document.getElementById('pacmanBtn').addEventListener('click', function() {
+            window.location.href = 'pacman.html';
+        });
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
 
         // Start game
         restartGame();
